@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flash_chat/constants.dart';
 
+final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
 class ChatScreen extends StatefulWidget {
   static const routeName = '/chat';
 
@@ -12,7 +14,6 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final auth.FirebaseAuth _auth = auth.FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   auth.User loggedUser;
   String message;
 
@@ -55,25 +56,7 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            StreamBuilder<QuerySnapshot>(
-                stream: _firestore.collection('messages').snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return Center(
-                      child: CircularProgressIndicator(
-                        backgroundColor: Colors.lightBlueAccent,
-                      ),
-                    );
-                  } else {
-                    return Expanded(
-                      child: ListView(
-                        children: snapshot.data.docs.map((messages) {
-                          return Text('${messages['text']} from ${messages['sender']}');
-                        }).toList(),
-                      ),
-                    );
-                  }
-                }),
+            MessageStream(),
             Container(
               decoration: kMessageContainerDecoration,
               child: Row(
@@ -102,6 +85,72 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class MessageBubble extends StatelessWidget {
+  final String text, sender;
+
+  MessageBubble({this.text, this.sender});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.all(10.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            sender,
+            style: TextStyle(
+              color: Colors.black54,
+              fontSize: 12.0,
+            ),
+          ),
+          Material(
+            borderRadius: BorderRadius.circular(30.0),
+            color: Colors.lightBlueAccent,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                vertical: 10.0,
+                horizontal: 20.0,
+              ),
+              child: Text(text),
+            ),
+            elevation: 5.0,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class MessageStream extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('messages').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(
+            child: CircularProgressIndicator(
+              backgroundColor: Colors.lightBlueAccent,
+            ),
+          );
+        } else {
+          return Expanded(
+            child: ListView(
+              children: snapshot.data.docs.map((messages) {
+                return MessageBubble(
+                  text: messages['text'],
+                  sender: messages['sender'],
+                );
+              }).toList(),
+            ),
+          );
+        }
+      },
     );
   }
 }
