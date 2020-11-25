@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flash_chat/constants.dart';
 
 final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+auth.User loggedUser;
 
 class ChatScreen extends StatefulWidget {
   static const routeName = '/chat';
@@ -14,13 +15,13 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final auth.FirebaseAuth _auth = auth.FirebaseAuth.instance;
-  auth.User loggedUser;
   String message;
+  TextEditingController textEditingController = TextEditingController();
 
   @override
   void initState() {
-    getCurrentUser();
     super.initState();
+    getCurrentUser();
   }
 
   getCurrentUser() async {
@@ -64,6 +65,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: <Widget>[
                   Expanded(
                     child: TextField(
+                      controller: textEditingController,
                       onChanged: (value) {
                         message = value;
                       },
@@ -72,7 +74,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   FlatButton(
                     onPressed: () {
-                      _firestore.collection('messages').add({'text': message, 'sender': loggedUser.email});
+                      textEditingController.clear();
+                      _firestore
+                          .collection('messages')
+                          .add({'text': message, 'sender': loggedUser.email, 'timestamp': Timestamp.now()});
                     },
                     child: Text(
                       'Send',
@@ -91,15 +96,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
 class MessageBubble extends StatelessWidget {
   final String text, sender;
+  final bool isMe;
 
-  MessageBubble({this.text, this.sender});
+  MessageBubble({this.text, this.sender, this.isMe});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.all(10.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Text(
             sender,
@@ -109,14 +115,30 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
           Material(
-            borderRadius: BorderRadius.circular(30.0),
-            color: Colors.lightBlueAccent,
+            borderRadius: isMe
+                ? BorderRadius.only(
+                    topLeft: Radius.circular(30.0),
+                    bottomLeft: Radius.circular(30.0),
+                    bottomRight: Radius.circular(30.0),
+                  )
+                : BorderRadius.only(
+                    topRight: Radius.circular(30.0),
+                    bottomLeft: Radius.circular(30.0),
+                    bottomRight: Radius.circular(30.0),
+                  ),
+            color: isMe ? Colors.lightBlueAccent : Colors.white,
             child: Padding(
               padding: EdgeInsets.symmetric(
                 vertical: 10.0,
                 horizontal: 20.0,
               ),
-              child: Text(text),
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: isMe ? Colors.white : Colors.black54,
+                  fontSize: 15.0,
+                ),
+              ),
             ),
             elevation: 5.0,
           ),
@@ -130,7 +152,7 @@ class MessageStream extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection('messages').snapshots(),
+      stream: _firestore.collection('messages').orderBy('timestamp', descending: true).snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return Center(
@@ -141,10 +163,13 @@ class MessageStream extends StatelessWidget {
         } else {
           return Expanded(
             child: ListView(
-              children: snapshot.data.docs.map((messages) {
+              reverse: true,
+              children: snapshot.data.docs.map((message) {
+                print(message['timestamp']);
                 return MessageBubble(
-                  text: messages['text'],
-                  sender: messages['sender'],
+                  text: message['text'],
+                  sender: message['sender'],
+                  isMe: message['sender'] == loggedUser.email,
                 );
               }).toList(),
             ),
