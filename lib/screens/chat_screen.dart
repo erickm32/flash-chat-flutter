@@ -65,10 +65,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     );
                   } else {
-                    return Column(
-                      children: snapshot.data.docs.map((messages) {
-                        return Text('${messages['text']} from ${messages['sender']}');
-                      }).toList(),
+                    return Expanded(
+                      child: ListView(
+                        children: snapshot.data.docs.map((messages) {
+                          return Text('${messages['text']} from ${messages['sender']}');
+                        }).toList(),
+                      ),
                     );
                   }
                 }),
